@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Drive Image Mapper</title>
+  <meta name="description" content="Draw clickable regions on images in Google Drive and link them to other documents.">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="assets/icon.svg" alt="" width="28" height="28">
+      <span class="brand-name">Image Mapper</span>
+    </div>
+    <div class="file-name" id="fileName"></div>
+    <div class="topbar-actions" id="fileActions" hidden>
+      <div class="segmented" role="group" aria-label="Mode">
+        <button type="button" data-mode="edit" id="modeEdit" aria-pressed="true">Edit</button>
+        <button type="button" data-mode="view" id="modeView" aria-pressed="false">View</button>
+      </div>
+      <button type="button" class="btn btn-sm" id="highlightBtn" aria-pressed="false" hidden>Show areas</button>
+      <span class="save-status" id="saveStatus" aria-live="polite"></span>
+      <button type="button" class="btn btn-primary" id="saveBtn">Save</button>
+      <div class="menu">
+        <button type="button" class="btn btn-icon" id="menuBtn" aria-haspopup="true" aria-expanded="false" aria-label="More">⋮</button>
+        <div class="menu-list" id="menuList" role="menu" hidden>
+          <button type="button" role="menuitem" data-action="open">Open another image…</button>
+          <button type="button" role="menuitem" data-action="share">Copy viewer link</button>
+          <button type="button" role="menuitem" data-action="html">Copy HTML image map</button>
+          <button type="button" role="menuitem" data-action="mapfile">Open map file in Drive</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="welcome" id="welcome">
+      <div class="welcome-card">
+        <img src="assets/icon.svg" alt="" width="64" height="64">
+        <h1>Image Mapper for Google Drive</h1>
+        <p id="welcomeText">Draw clickable areas on an image in your Drive and link each one to a Doc, Sheet, folder or web page.</p>
+        <div class="welcome-actions">
+          <button type="button" class="btn btn-primary btn-lg" id="startBtn">Sign in with Google</button>
+          <a class="btn btn-lg" href="?demo" id="demoLink">Try the demo</a>
+        </div>
+        <p class="welcome-error" id="welcomeError" role="alert" hidden></p>
+      </div>
+    </section>
+
+    <section class="workspace" id="workspace" hidden>
+      <div class="canvas-wrap" id="canvasWrap"></div>
+
+      <aside class="sidebar" id="sidebar">
+        <div class="panel" id="toolPanel">
+          <h2>Draw</h2>
+          <div class="tools" role="group" aria-label="Tool">
+            <button type="button" class="tool" data-tool="select" aria-pressed="true" title="Select and move (V)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6 1.5L10 19z"/></svg><span>Select</span>
+            </button>
+            <button type="button" class="tool" data-tool="rect" aria-pressed="false" title="Rectangle (R)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="6" width="16" height="12" rx="1"/></svg><span>Rectangle</span>
+            </button>
+            <button type="button" class="tool" data-tool="circle" aria-pressed="false" title="Circle (C)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg><span>Circle</span>
+            </button>
+            <button type="button" class="tool" data-tool="poly" aria-pressed="false" title="Polygon (P)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9l7-5 9 6-3 10H7z"/></svg><span>Polygon</span>
+            </button>
+          </div>
+          <p class="hint" id="toolHint"></p>
+        </div>
+
+        <div class="panel" id="propsPanel" hidden>
+          <h2>Selected area</h2>
+          <label class="field">
+            <span>Label</span>
+            <input type="text" id="regionTitle" placeholder="Shown on hover">
+          </label>
+          <div class="field">
+            <span>Links to</span>
+            <div class="link-card" id="linkCard" hidden>
+              <img id="linkIcon" alt="" width="16" height="16">
+              <a id="linkName" target="_blank" rel="noopener"></a>
+              <button type="button" class="btn btn-icon btn-sm" id="linkClear" aria-label="Remove link">×</button>
+            </div>
+            <button type="button" class="btn btn-block" id="pickLink">Choose from Google Drive…</button>
+            <div class="url-row">
+              <input type="url" id="linkUrl" placeholder="or paste a URL">
+              <button type="button" class="btn btn-sm" id="linkUrlApply">Set</button>
+            </div>
+          </div>
+          <div class="props-actions">
+            <button type="button" class="btn btn-sm" id="raiseBtn" title="Bring forward">Bring forward</button>
+            <button type="button" class="btn btn-sm" id="lowerBtn" title="Send backward">Send backward</button>
+            <button type="button" class="btn btn-sm btn-danger" id="deleteBtn">Delete area</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Areas <span class="count" id="regionCount">0</span></h2>
+          <ol class="region-list" id="regionList"></ol>
+          <p class="hint" id="emptyHint">No areas yet. Pick a drawing tool and drag across the image.</p>
+        </div>
+      </aside>
+    </section>
+
+    <div class="loading" id="loading" hidden>
+      <div class="spinner" aria-hidden="true"></div>
+      <span id="loadingText">Loading…</span>
+    </div>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <footer class="footer">
+    <a href="privacy.html">Privacy</a>
+    <a href="terms.html">Terms</a>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/drive.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

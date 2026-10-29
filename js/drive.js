@@ -1,0 +1,203 @@
+// Thin wrapper around Google Identity Services, the Drive v3 REST API and Google Picker.
+// Uses the drive.file scope: the app can only touch files the user opened with it,
+// picked in Picker, or that the app created itself.
+(function () {
+  const SCOPES = [
+    'https://www.googleapis.com/auth/drive.file',
+    // Lets Drive list the app under "Open with" and "New" for this user.
+    'https://www.googleapis.com/auth/drive.install',
+  ].join(' ');
+
+  const API = 'https://www.googleapis.com/drive/v3';
+  const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
+  const MAP_MIME = 'application/vnd.drive-image-map+json';
+  const FILE_FIELDS = 'id,name,mimeType,trashed,parents,appProperties,webViewLink,resourceKey,capabilities(canEdit,canAddChildren)';
+
+  const cfg = window.IMAGE_MAPPER_CONFIG || {};
+  let tokenClient = null;
+  let accessToken = null;
+  let tokenExpiry = 0;
+  let loginHint = '';
+  let pickerLoaded = null;
+
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.async = true;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('Could not load ' + src));
+      document.head.appendChild(s);
+    });
+  }
+
+  function isConfigured() {
+    return !!cfg.clientId && !cfg.clientId.startsWith('YOUR_');
+  }
+
+  async function init(hint) {
+    loginHint = hint || '';
+    await Promise.all([
+      loadScript('https://accounts.google.com/gsi/client'),
+      loadScript('https://apis.google.com/js/api.js'),
+    ]);
+    pickerLoaded = new Promise((resolve) => gapi.load('picker', resolve));
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: cfg.clientId,
+      scope: SCOPES,
+      callback: () => {},
+    });
+  }
+
+  function hasToken() {
+    return !!accessToken && Date.now() < tokenExpiry - 60000;
+  }
+
+  // Must run inside a user gesture the first time, or the popup gets blocked.
+  function signIn() {
+    if (hasToken()) return Promise.resolve(accessToken);
+    return new Promise((resolve, reject) => {
+      tokenClient.callback = (resp) => {
+        if (resp.error) return reject(new Error(resp.error_description || resp.error));
+        accessToken = resp.access_token;
+        tokenExpiry = Date.now() + resp.expires_in * 1000;
+        resolve(accessToken);
+      };
+      tokenClient.error_callback = (err) => reject(new Error(err.message || err.type || 'Sign-in failed'));
+      tokenClient.requestAccessToken({ prompt: '', login_hint: loginHint });
+    });
+  }
+
+  function resourceKeyHeader(keys) {
+    const entries = Object.entries(keys || {}).filter(([, v]) => v);
+    if (!entries.length) return {};
+    return { 'X-Goog-Drive-Resource-Keys': entries.map(([id, key]) => `${id}/${key}`).join(',') };
+  }
+
+  const resourceKeys = {};
+
+  async function request(url, opts = {}) {
+    const token = await signIn();
+    const res = await fetch(url, {
+      ...opts,
+      headers: { ...resourceKeyHeader(resourceKeys), ...(opts.headers || {}), Authorization: `Bearer ${token}` },
+    });
+    if (res.status === 401) {
+      accessToken = null;
+    }
+    if (!res.ok) {
+      let message = `${res.status} ${res.statusText}`;
+      try {
+        const body = await res.json();
+        if (body.error && body.error.message) message = body.error.message;
+      } catch (e) { /* not JSON */ }
+      const err = new Error(message);
+      err.status = res.status;
+      throw err;
+    }
+    return res;
+  }
+
+  function addResourceKeys(keys) {
+    Object.assign(resourceKeys, keys || {});
+  }
+
+  async function getFile(id) {
+    const res = await request(`${API}/files/${encodeURIComponent(id)}?fields=${FILE_FIELDS}&supportsAllDrives=true`);
+    const file = await res.json();
+    if (file.resourceKey) resourceKeys[file.id] = file.resourceKey;
+    return file;
+  }
+
+  async function download(id) {
+    const res = await request(`${API}/files/${encodeURIComponent(id)}?alt=media&supportsAllDrives=true`);
+    return res.blob();
+  }
+
+  async function findMapForImage(imageId) {
+    const q = `appProperties has { key='imageId' and value='${imageId.replace(/'/g, "\\'")}' } and trashed=false`;
+    const url = `${API}/files?q=${encodeURIComponent(q)}&fields=files(${FILE_FIELDS})&orderBy=modifiedTime desc&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+    const res = await request(url);
+    const body = await res.json();
+    return body.files && body.files[0] ? body.files[0] : null;
+  }
+
+  // Create (no id) or update (id) a file with metadata + text content in one request.
+  async function upload(id, metadata, content, mimeType) {
+    const boundary = 'imagemapper' + Math.random().toString(36).slice(2);
+    const body =
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+      `--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n${content}\r\n--${boundary}--`;
+    const url = id
+      ? `${UPLOAD}/files/${encodeURIComponent(id)}?uploadType=multipart&fields=${FILE_FIELDS}&supportsAllDrives=true`
+      : `${UPLOAD}/files?uploadType=multipart&fields=${FILE_FIELDS}&supportsAllDrives=true`;
+    const res = await request(url, {
+      method: id ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+      body,
+    });
+    return res.json();
+  }
+
+  async function updateMetadata(id, metadata) {
+    const res = await request(`${API}/files/${encodeURIComponent(id)}?fields=id&supportsAllDrives=true`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(metadata),
+    });
+    return res.json();
+  }
+
+  // Opens Google Picker. Resolves to an array of picked docs, or null if cancelled.
+  //   kind: 'image' | 'any'
+  //   fileIds: preselect specific files (used to grant access to a shared map/image)
+  async function pick({ kind = 'any', fileIds = null, title = '', multiple = false } = {}) {
+    await pickerLoaded;
+    const token = await signIn();
+    return new Promise((resolve) => {
+      const P = google.picker;
+      const builder = new P.PickerBuilder()
+        .setOAuthToken(token)
+        .setDeveloperKey(cfg.apiKey)
+        .setAppId(cfg.appId)
+        .enableFeature(P.Feature.SUPPORT_DRIVES)
+        .setOrigin(window.location.origin)
+        .setCallback((data) => {
+          if (data[P.Response.ACTION] === P.Action.PICKED) resolve(data[P.Response.DOCUMENTS]);
+          else if (data[P.Response.ACTION] === P.Action.CANCEL) resolve(null);
+        });
+      if (title) builder.setTitle(title);
+      if (multiple) builder.enableFeature(P.Feature.MULTISELECT_ENABLED);
+
+      if (fileIds) {
+        const view = new P.DocsView().setFileIds(fileIds.join(',')).setMode(P.DocsViewMode.LIST);
+        builder.addView(view);
+      } else if (kind === 'image') {
+        builder.addView(new P.DocsView(P.ViewId.DOCS_IMAGES).setIncludeFolders(true));
+        builder.addView(new P.DocsView(P.ViewId.DOCS_IMAGES).setEnableDrives(true).setIncludeFolders(true));
+        builder.addView(new P.DocsUploadView());
+      } else {
+        builder.addView(new P.DocsView().setIncludeFolders(true).setSelectFolderEnabled(true));
+        builder.addView(new P.DocsView().setOwnedByMe(false));
+        builder.addView(new P.DocsView().setEnableDrives(true).setIncludeFolders(true).setSelectFolderEnabled(true));
+        builder.addView(P.ViewId.RECENTLY_PICKED);
+      }
+      builder.build().setVisible(true);
+    });
+  }
+
+  window.Drive = {
+    MAP_MIME,
+    isConfigured,
+    init,
+    hasToken,
+    signIn,
+    addResourceKeys,
+    getFile,
+    download,
+    findMapForImage,
+    upload,
+    updateMetadata,
+    pick,
+  };
+})();
