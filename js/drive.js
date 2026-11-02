@@ -11,6 +11,8 @@
   const API = 'https://www.googleapis.com/drive/v3';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
   const MAP_MIME = 'application/vnd.drive-image-map+json';
+  const FOLDER_MIME = 'application/vnd.google-apps.folder';
+  const IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp', 'image/svg+xml'];
   const FILE_FIELDS = 'id,name,mimeType,trashed,parents,appProperties,webViewLink,resourceKey,capabilities(canEdit,canAddChildren)';
 
   const cfg = window.IMAGE_MAPPER_CONFIG || {};
@@ -172,15 +174,32 @@
       if (fileIds) {
         const view = new P.DocsView().setFileIds(fileIds.join(',')).setMode(P.DocsViewMode.LIST);
         builder.addView(view);
-      } else if (kind === 'image') {
-        builder.addView(new P.DocsView(P.ViewId.DOCS_IMAGES).setIncludeFolders(true));
-        builder.addView(new P.DocsView(P.ViewId.DOCS_IMAGES).setEnableDrives(true).setIncludeFolders(true));
-        builder.addView(new P.DocsUploadView());
       } else {
-        builder.addView(new P.DocsView().setIncludeFolders(true).setSelectFolderEnabled(true));
-        builder.addView(new P.DocsView().setOwnedByMe(false));
-        builder.addView(new P.DocsView().setEnableDrives(true).setIncludeFolders(true).setSelectFolderEnabled(true));
-        builder.addView(P.ViewId.RECENTLY_PICKED);
+        // Folder-browsable tabs. With a MIME filter, folders only show if their
+        // type is in the filter too; setSelectFolderEnabled decides whether a
+        // folder can be picked or only opened.
+        const images = kind === 'image';
+        const mimeTypes = images ? IMAGE_MIME_TYPES.concat(FOLDER_MIME).join(',') : null;
+        const tab = (label, configure) => {
+          const view = new P.DocsView(P.ViewId.DOCS)
+            .setIncludeFolders(true)
+            .setSelectFolderEnabled(!images)
+            .setMode(P.DocsViewMode.LIST);
+          if (mimeTypes) view.setMimeTypes(mimeTypes);
+          configure(view);
+          if (view.setLabel) view.setLabel(label);
+          builder.addView(view);
+        };
+        tab('My Drive', (v) => v.setParent('root'));
+        tab('Shared with me', (v) => v.setOwnedByMe(false));
+        tab('Shared drives', (v) => v.setEnableDrives(true));
+        tab('Starred', (v) => v.setStarred(true));
+        if (images) {
+          builder.addView(new P.DocsView(P.ViewId.DOCS_IMAGES).setMode(P.DocsViewMode.GRID));
+          builder.addView(new P.DocsUploadView().setIncludeFolders(true));
+        } else {
+          builder.addView(P.ViewId.RECENTLY_PICKED);
+        }
       }
       builder.build().setVisible(true);
     });
