@@ -268,7 +268,19 @@
     const corners = trace(mask, w, h);
     if (!corners || corners.length < 3) return { error: 'Nothing to outline there.' };
     const ring = Geometry.simplify(corners, 1.5).map(([px, py]) => [Geometry.round(px / scale), Geometry.round(py / scale)]);
-    return ring.length >= 3 ? { ring } : { error: 'Nothing to outline there.' };
+    if (ring.length < 3) return { error: 'Nothing to outline there.' };
+    let filled = 0;
+    for (let p = 0; p < w * h; p++) filled += mask[p];
+    return {
+      ring,
+      // Share of the picture the area covers, and a pixel-accurate hit test.
+      coverage: filled / (w * h),
+      has: (px, py) => {
+        const ix = Math.floor(px * scale);
+        const iy = Math.floor(py * scale);
+        return ix >= 0 && iy >= 0 && ix < w && iy < h && mask[iy * w + ix] === 1;
+      },
+    };
   }
 
   function reset() {
