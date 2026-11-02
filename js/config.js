@@ -3,10 +3,10 @@
 // Restrict the API key to your site's origin and to the Google Picker API.
 window.IMAGE_MAPPER_CONFIG = {
   // OAuth 2.0 Client ID (type "Web application").
-  clientId: 'YOUR_CLIENT_ID.apps.googleusercontent.com',
+  clientId: '956262906682-mv340a5pa716rojotbmv75tjmd27rgfv.apps.googleusercontent.com',
   // API key, used only by Google Picker.
-  apiKey: 'YOUR_API_KEY',
+  apiKey: 'AIzaSyD9ymuAhwBBPsgJqO-RaPqw0daC8-5HeuQ',
   // Cloud project *number* (not the project ID). Picker needs it so that files
   // the user picks become readable under the drive.file scope.
-  appId: 'YOUR_PROJECT_NUMBER',
+  appId: '956262906682',
 };
