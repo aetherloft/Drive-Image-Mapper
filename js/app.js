@@ -239,6 +239,11 @@
         mapData = await readMap(file.id);
         image = await withAccess([mapData.imageId], () => Drive.getFile(mapData.imageId),
           'This map points to an image you need to select once to open.');
+        // Maps made outside the app (by hand or by another tool) aren't linked from
+        // their image yet. Link them so opening the image finds this map next time.
+        if (!(image.appProperties && image.appProperties.imageMapFileId)) {
+          Drive.updateMetadata(image.id, { appProperties: { imageMapFileId: mapFile.id } }).catch(() => {});
+        }
       } else if (file.mimeType && file.mimeType.startsWith('image/')) {
         image = file;
         const mapId = file.appProperties && file.appProperties.imageMapFileId;
