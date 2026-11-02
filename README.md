@@ -63,7 +63,10 @@ Under **Google Auth Platform** (older consoles: **APIs & Services → OAuth cons
 Under **APIs & Services → Credentials**:
 
 1. **Create credentials → OAuth client ID**, type **Web application**. Add `APP_URL`'s origin (for example `https://your-user.github.io`) under **Authorized JavaScript origins**. No redirect URI is needed.
-2. **Create credentials → API key**. Restrict it to the **Google Picker API** and to HTTP referrer `APP_URL*`.
+2. **Create credentials → API key**, then click the key's name to restrict it:
+   - **Application restrictions**: choose **Websites** (older consoles: **HTTP referrers (web sites)**). Under **Website restrictions** click **Add** and enter your site address followed by `*`, for example `https://your-username.github.io/Drive-Image-Mapper/*`. Match the capitals of your Pages address. For local testing, add `http://localhost:8000/*` as well and remove it later.
+   - **API restrictions**: choose **Restrict key** and tick only **Google Picker API**. If it isn't listed, enable it under **APIs & Services → Library** first.
+   - Click **Save**. Restrictions can take up to five minutes to apply.
 
 Put the three values in `js/config.js`:
 
