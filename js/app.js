@@ -309,6 +309,104 @@
     }
   }
 
+  // ---------- open dialog: recent files ----------
+
+  let recentFiles = [];
+  let recentFilter = 'all';
+
+  function ago(iso) {
+    const secs = (Date.parse(iso) - Date.now()) / 1000;
+    const units = [['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60]];
+    const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+    for (const [unit, size] of units) {
+      if (Math.abs(secs) >= size) return rtf.format(Math.round(secs / size), unit);
+    }
+    return 'just now';
+  }
+
+  function renderRecent() {
+    const list = $('recentList');
+    list.replaceChildren();
+    const shown = recentFiles.filter((f) => recentFilter === 'all' || (recentFilter === 'map') === isMapFile(f));
+    for (const f of shown) {
+      const li = document.createElement('li');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      const thumb = document.createElement('span');
+      thumb.className = 'recent-thumb';
+      if (f.thumbnailLink && !isMapFile(f)) {
+        thumb.style.backgroundImage = `url("${f.thumbnailLink}")`;
+      } else {
+        const icon = document.createElement('img');
+        icon.alt = '';
+        icon.src = isMapFile(f) ? 'assets/icon.svg' : (f.iconLink || 'assets/icon.svg');
+        thumb.appendChild(icon);
+      }
+      const text = document.createElement('span');
+      text.className = 'recent-text';
+      const name = document.createElement('span');
+      name.className = 'recent-name';
+      name.textContent = f.name;
+      const meta = document.createElement('span');
+      meta.className = 'recent-meta';
+      const changed = f.modifiedTime && (!f.viewedByMeTime || f.modifiedTime >= f.viewedByMeTime);
+      const when = changed ? f.modifiedTime : f.viewedByMeTime;
+      meta.textContent = `${isMapFile(f) ? 'Map' : 'Image'} · ${changed ? 'changed' : 'opened'} ${when ? ago(when) : ''}`;
+      text.append(name, meta);
+      btn.append(thumb, text);
+      btn.addEventListener('click', () => {
+        $('openDialog').close();
+        state.newMapFolderId = null;
+        openFile(f.id);
+      });
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+    const note = $('recentNote');
+    note.hidden = shown.length > 0;
+    if (!shown.length) {
+      note.textContent = recentFiles.length
+        ? `No recent ${recentFilter === 'map' ? 'maps' : 'images'}.`
+        : 'Nothing opened in Image Mapper yet. Browse Google Drive to pick an image or map.';
+    }
+  }
+
+  async function showOpenDialog(folderId) {
+    const dialog = $('openDialog');
+    dialog.dataset.folderId = folderId || '';
+    $('recentList').replaceChildren();
+    $('recentNote').hidden = false;
+    $('recentNote').textContent = 'Loading recent files…';
+    if (!dialog.open) dialog.showModal();
+    try {
+      recentFiles = await Drive.listRecent();
+    } catch (err) {
+      recentFiles = [];
+      $('recentNote').textContent = 'Could not load recent files: ' + err.message;
+      return;
+    }
+    // First visit: nothing to list, so go straight to Drive.
+    if (!recentFiles.length && $('workspace').hidden) {
+      dialog.close();
+      chooseImage(folderId);
+      return;
+    }
+    renderRecent();
+  }
+
+  document.querySelectorAll('#openDialog .chip').forEach((chip) => chip.addEventListener('click', () => {
+    recentFilter = chip.dataset.filter;
+    document.querySelectorAll('#openDialog .chip').forEach((c) => c.setAttribute('aria-pressed', String(c === chip)));
+    renderRecent();
+  }));
+  $('openClose').addEventListener('click', () => $('openDialog').close());
+  $('browseBtn').addEventListener('click', () => {
+    const folderId = $('openDialog').dataset.folderId || undefined;
+    // Picker can't sit above a modal dialog, so close it first.
+    $('openDialog').close();
+    chooseImage(folderId);
+  });
+
   function serialize() {
     return JSON.stringify({
       format: MAP_FORMAT,
@@ -530,7 +628,7 @@
         location.href = location.pathname;
         return;
       }
-      chooseImage();
+      showOpenDialog();
     } else if (action === 'share') {
       if (state.demo) return toast('Sign in with Google to share maps.');
       if (state.dirty || !state.mapFile) await save();
@@ -734,8 +832,10 @@
         showWelcome(null, err.message);
         return;
       }
-      if (request.action === 'open') openFile(request.id, request.related);
-      else chooseImage(request.folderId);
+      $('startBtn').textContent = 'Open an image or map';
+      if (request.action === 'open' && !state.image) openFile(request.id, request.related);
+      else if (request.action === 'create') chooseImage(request.folderId);
+      else showOpenDialog();
     });
   }
 

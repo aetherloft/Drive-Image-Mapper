@@ -26,6 +26,7 @@ The app builds a `.pptx` in the browser and has Drive convert it on upload, beca
 
 ## Features
 
+- An Open window listing the images and maps you've recently opened or changed in the app, with Maps / Images filters and a button to browse all of Drive
 - Rectangle, circle and polygon areas, stored in the image's own pixel coordinates
 - Select, move, reshape, reorder and delete areas
 - Link areas to Drive files through Google Picker, or to any `http`, `https` or `mailto` URL

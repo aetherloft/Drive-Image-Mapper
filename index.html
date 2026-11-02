@@ -26,7 +26,7 @@
       <div class="menu">
         <button type="button" class="btn btn-icon" id="menuBtn" aria-haspopup="true" aria-expanded="false" aria-label="More">⋮</button>
         <div class="menu-list" id="menuList" role="menu" hidden>
-          <button type="button" role="menuitem" data-action="open">Open another image…</button>
+          <button type="button" role="menuitem" data-action="open">Open…</button>
           <button type="button" role="menuitem" data-action="share">Copy viewer link</button>
           <button type="button" role="menuitem" data-action="slides">Save as Google Slides</button>
           <button type="button" role="menuitem" data-action="openslides" hidden>Present Google Slides version</button>
@@ -113,6 +113,24 @@
       <span id="loadingText">Loading…</span>
     </div>
   </main>
+
+  <dialog class="dialog" id="openDialog" aria-labelledby="openTitle">
+    <div class="dialog-head">
+      <h2 id="openTitle">Open</h2>
+      <button type="button" class="btn btn-icon" id="openClose" aria-label="Close">×</button>
+    </div>
+    <div class="chips" role="group" aria-label="Show">
+      <button type="button" class="chip" data-filter="all" aria-pressed="true">All</button>
+      <button type="button" class="chip" data-filter="map" aria-pressed="false">Maps</button>
+      <button type="button" class="chip" data-filter="image" aria-pressed="false">Images</button>
+    </div>
+    <ul class="recent-list" id="recentList" aria-label="Recent files"></ul>
+    <p class="recent-note" id="recentNote" hidden></p>
+    <div class="dialog-foot">
+      <span class="hint">Recently opened or changed in Image Mapper</span>
+      <button type="button" class="btn btn-primary" id="browseBtn">Browse Google Drive…</button>
+    </div>
+  </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 

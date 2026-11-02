@@ -124,6 +124,18 @@
     return body.files && body.files[0] ? body.files[0] : null;
   }
 
+  // Images and maps the app can see, most recently opened or changed first.
+  // Under drive.file that's exactly the ones the user has used with this app.
+  async function listRecent(limit = 40) {
+    const q = `trashed=false and (mimeType='${MAP_MIME}' or mimeType contains 'image/')`;
+    const fields = 'files(id,name,mimeType,modifiedTime,viewedByMeTime,iconLink,thumbnailLink)';
+    const url = `${API}/files?q=${encodeURIComponent(q)}&orderBy=${encodeURIComponent('recency desc')}` +
+      `&pageSize=${limit}&fields=${encodeURIComponent(fields)}&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+    const res = await request(url);
+    const body = await res.json();
+    return body.files || [];
+  }
+
   // Create (no id) or update (id) a file with metadata + content in one request.
   // content is a string or a Blob. When metadata.mimeType is a Google type
   // (e.g. a presentation), Drive converts the uploaded content into it.
@@ -202,6 +214,7 @@
         if (images) {
           builder.addView(new P.DocsView(P.ViewId.DOCS_IMAGES).setMode(P.DocsViewMode.GRID));
           builder.addView(new P.DocsUploadView().setIncludeFolders(true));
+          builder.addView(P.ViewId.RECENTLY_PICKED);
         } else {
           builder.addView(P.ViewId.RECENTLY_PICKED);
         }
@@ -220,6 +233,7 @@
     getFile,
     download,
     findMapForImage,
+    listRecent,
     upload,
     updateMetadata,
     pick,

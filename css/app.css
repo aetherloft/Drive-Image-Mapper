@@ -352,6 +352,71 @@ polyline.draft { fill: none; }
 }
 .footer a { color: var(--muted); }
 
+/* ---------- open dialog ---------- */
+
+.dialog {
+  width: min(560px, calc(100% - 32px));
+  max-height: min(640px, calc(100% - 32px));
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+.dialog[open] { display: flex; flex-direction: column; }
+.dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
+.dialog-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 6px; }
+.dialog-head h2 { margin: 0; font-size: 18px; }
+.chips { display: flex; gap: 6px; padding: 4px 16px 10px; }
+.chip {
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+}
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.recent-list { list-style: none; margin: 0; padding: 0 8px; overflow-y: auto; flex: 1; min-height: 120px; border-top: 1px solid var(--border); }
+.recent-list button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.recent-list button:hover { background: var(--accent-soft); }
+.recent-thumb {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: var(--bg) center / cover no-repeat;
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+}
+.recent-thumb img { width: 20px; height: 20px; }
+.recent-text { min-width: 0; flex: 1; }
+.recent-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-meta { display: block; color: var(--muted); font-size: 12px; }
+.recent-note { margin: 0; padding: 24px 16px; color: var(--muted); text-align: center; }
+.dialog-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+.dialog-foot .hint { margin: 0; }
+
 /* ---------- small screens ---------- */
 
 @media (max-width: 760px) {
@@ -361,5 +426,7 @@ polyline.draft { fill: none; }
   .brand-name { display: none; }
   .topbar { gap: 8px; padding: 8px 12px; flex-wrap: wrap; }
   .save-status { display: none; }
+  .dialog-foot .hint { display: none; }
+  .dialog-foot .btn { width: 100%; }
 }
 .toast a { color: #8ab4f8; font-weight: 600; margin-left: 4px; }
