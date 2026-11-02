@@ -138,6 +138,10 @@
         }
       };
       li.addEventListener('click', activate);
+      li.addEventListener('mouseenter', () => editor.setHover(region.id));
+      li.addEventListener('mouseleave', () => editor.setHover(null));
+      li.addEventListener('focus', () => editor.setHover(region.id));
+      li.addEventListener('blur', () => editor.setHover(null));
       li.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') activate();
       });

@@ -13,6 +13,8 @@
   --unlinked-fill: rgba(249, 171, 0, 0.2);
   --unlinked-stroke: #e37400;
   --selected-stroke: #d93025;
+  --hover-fill: rgba(216, 27, 96, 0.32);
+  --hover-stroke: #c2185b;
   --canvas-bg: #e8eaed;
   --shadow: 0 1px 3px rgba(60, 64, 67, 0.3), 0 4px 8px rgba(60, 64, 67, 0.15);
   color-scheme: light;
@@ -34,6 +36,8 @@
     --unlinked-fill: rgba(253, 214, 99, 0.2);
     --unlinked-stroke: #fdd663;
     --selected-stroke: #f28b82;
+    --hover-fill: rgba(244, 143, 177, 0.35);
+    --hover-stroke: #f48fb1;
     --canvas-bg: #121212;
     --shadow: 0 1px 3px rgba(0, 0, 0, 0.6), 0 4px 8px rgba(0, 0, 0, 0.4);
     color-scheme: dark;
@@ -298,6 +302,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, .region:focus-visibl
 .stage[data-mode="edit"][data-tool="select"] .region { cursor: move; }
 .region.is-selected { stroke: var(--selected-stroke); }
 .handle { fill: #fff; stroke: var(--selected-stroke); cursor: grab; }
+/* Highlight from hovering the area's row in the list; wins over every mode's styling. */
+.stage .region.is-hovered,
+.stage[data-mode="view"] .region.is-hovered { fill: var(--hover-fill); stroke: var(--hover-stroke); stroke-dasharray: none; }
 .handle.is-first { fill: var(--selected-stroke); }
 .draft { fill: var(--region-fill); stroke: var(--region-stroke); stroke-dasharray: 4 3; pointer-events: none; }
 polyline.draft { fill: none; }

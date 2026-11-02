@@ -44,6 +44,7 @@
       this.onNotice = onNotice || (() => {});
       this.regions = [];
       this.selection = []; // ids, in the order they were picked
+      this.hoverId = null; // region highlighted from outside (the area list)
       this.mode = 'edit';
       this.tool = 'select';
       this.width = 0;
@@ -115,6 +116,13 @@
 
     getRegion(id) {
       return this.regions.find((r) => r.id === id) || null;
+    }
+
+    // Highlights a region, e.g. while its row in the area list is hovered.
+    setHover(id) {
+      if (this.hoverId === id) return;
+      this.hoverId = id;
+      this.render();
     }
 
     // The one selected region, or null when nothing or several are selected.
@@ -564,6 +572,7 @@
         const linked = !!(region.link && region.link.url);
         const cls = ['region', linked ? 'is-linked' : 'is-unlinked'];
         if (this.selection.includes(region.id)) cls.push('is-selected');
+        if (region.id === this.hoverId) cls.push('is-hovered');
         const node = this.shapeNode(region.shape, region.coords, {
           class: cls.join(' '),
           'data-region': region.id,
@@ -583,6 +592,10 @@
         const label = region.title || (region.link && region.link.name);
         if (label) el('title', {}, node).textContent = label;
       });
+
+      // Bring the highlighted region in front of any overlapping neighbours.
+      const hovered = this.hoverId && svg.querySelector(`[data-region="${CSS.escape(this.hoverId)}"]`);
+      if (hovered) svg.appendChild(hovered);
 
       const selected = this.mode === 'edit' && this.getRegion(this.selectedId);
       if (selected && this.tool === 'select') {
