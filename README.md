@@ -48,7 +48,7 @@ Under **Google Auth Platform** (older consoles: **APIs & Services → OAuth cons
 2. App name `Image Mapper`, support email, and the logo from `assets/icons/icon-128.png`.
 3. App domain links: home page `APP_URL`, privacy policy `APP_URL/privacy.html`, terms `APP_URL/terms.html`.
 4. Authorized domain: your host's domain (for GitHub Pages, `github.io` won't verify; see the note under publishing below).
-5. Scopes: add `.../auth/drive.file` and `.../auth/drive.install`. Both are non-sensitive, so the app won't need Google's security assessment.
+5. Scopes are on a separate page: **Google Auth Platform → Data Access → Add or remove scopes**. Tick `.../auth/drive.file` (filter for "drive"). `drive.install` usually isn't listed, so paste `https://www.googleapis.com/auth/drive.install` into **Manually add scopes** at the bottom of the panel and click **Add to table**. Click **Update**, then **Save**. Both should appear under non-sensitive scopes, so the app won't need Google's security assessment. (Older consoles show this as step 2 of the OAuth consent screen wizard.)
 6. While the app is in **Testing**, add your own address (and anyone else's who'll try it) as a test user.
 
 ### 4. Credentials
