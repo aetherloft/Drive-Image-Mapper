@@ -184,7 +184,7 @@
         // type is in the filter too; setSelectFolderEnabled decides whether a
         // folder can be picked or only opened.
         const images = kind === 'image';
-        const mimeTypes = images ? IMAGE_MIME_TYPES.concat(FOLDER_MIME).join(',') : null;
+        const mimeTypes = images ? IMAGE_MIME_TYPES.concat(MAP_MIME, FOLDER_MIME).join(',') : null;
         const tab = (label, configure) => {
           const view = new P.DocsView(P.ViewId.DOCS)
             .setIncludeFolders(true)

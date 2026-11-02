@@ -244,6 +244,9 @@
         if (!(image.appProperties && image.appProperties.imageMapFileId)) {
           Drive.updateMetadata(image.id, { appProperties: { imageMapFileId: mapFile.id } }).catch(() => {});
         }
+        if (!(mapFile.appProperties && mapFile.appProperties.imageId) && mapFile.capabilities && mapFile.capabilities.canEdit) {
+          Drive.updateMetadata(mapFile.id, { appProperties: { imageId: image.id } }).catch(() => {});
+        }
       } else if (file.mimeType && file.mimeType.startsWith('image/')) {
         image = file;
         const mapId = file.appProperties && file.appProperties.imageMapFileId;
@@ -293,7 +296,7 @@
 
   async function chooseImage(folderId) {
     try {
-      const picked = await Drive.pick({ kind: 'image', title: 'Choose an image to map' });
+      const picked = await Drive.pick({ kind: 'image', title: 'Choose an image or an .imap map' });
       if (!picked || !picked[0]) {
         if ($('workspace').hidden) showWelcome('Choose an image from your Drive to start mapping.');
         return;
