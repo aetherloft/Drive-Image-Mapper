@@ -306,7 +306,10 @@
 
   async function chooseImage(folderId) {
     try {
-      const picked = await Drive.pick({ kind: 'image', title: 'Choose an image or an .imap map' });
+      // Start where the user is: the folder Drive's "New" was used in, else the
+      // current image's folder.
+      const startFolder = folderId || (state.image && state.image.parents && state.image.parents[0]) || null;
+      const picked = await Drive.pick({ kind: 'image', title: 'Choose an image or an .imap map', startFolder });
       if (!picked || !picked[0]) {
         if ($('workspace').hidden) showWelcome('Choose an image from your Drive to start mapping.');
         return;

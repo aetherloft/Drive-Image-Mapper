@@ -170,7 +170,8 @@
   // Opens Google Picker. Resolves to an array of picked docs, or null if cancelled.
   //   kind: 'image' | 'any'
   //   fileIds: preselect specific files (used to grant access to a shared map/image)
-  async function pick({ kind = 'any', fileIds = null, title = '', multiple = false } = {}) {
+  //   startFolder: open on this folder first (its own tab ahead of My Drive)
+  async function pick({ kind = 'any', fileIds = null, title = '', multiple = false, startFolder = null } = {}) {
     await pickerLoaded;
     const token = await signIn();
     return new Promise((resolve) => {
@@ -207,6 +208,8 @@
           if (view.setLabel) view.setLabel(label);
           builder.addView(view);
         };
+        // Picker opens on the first tab, so the current folder goes first.
+        if (startFolder) tab('This folder', (v) => v.setParent(startFolder));
         tab('My Drive', (v) => v.setParent('root'));
         tab('Shared with me', (v) => v.setOwnedByMe(false));
         tab('Shared drives', (v) => v.setEnableDrives(true));
