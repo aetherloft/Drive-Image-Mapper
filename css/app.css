@@ -339,6 +339,7 @@ polyline.draft { fill: none; }
   box-shadow: var(--shadow);
 }
 .toast.is-error { background: #b3261e; }
+.toast.is-error a { color: #fff; }
 
 .footer {
   display: flex;
@@ -361,3 +362,4 @@ polyline.draft { fill: none; }
   .topbar { gap: 8px; padding: 8px 12px; flex-wrap: wrap; }
   .save-status { display: none; }
 }
+.toast a { color: #8ab4f8; font-weight: 600; margin-left: 4px; }

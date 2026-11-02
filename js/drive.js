@@ -124,12 +124,17 @@
     return body.files && body.files[0] ? body.files[0] : null;
   }
 
-  // Create (no id) or update (id) a file with metadata + text content in one request.
+  // Create (no id) or update (id) a file with metadata + content in one request.
+  // content is a string or a Blob. When metadata.mimeType is a Google type
+  // (e.g. a presentation), Drive converts the uploaded content into it.
   async function upload(id, metadata, content, mimeType) {
     const boundary = 'imagemapper' + Math.random().toString(36).slice(2);
-    const body =
-      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
-      `--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n${content}\r\n--${boundary}--`;
+    const body = new Blob([
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`,
+      `--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`,
+      content,
+      `\r\n--${boundary}--`,
+    ]);
     const url = id
       ? `${UPLOAD}/files/${encodeURIComponent(id)}?uploadType=multipart&fields=${FILE_FIELDS}&supportsAllDrives=true`
       : `${UPLOAD}/files?uploadType=multipart&fields=${FILE_FIELDS}&supportsAllDrives=true`;

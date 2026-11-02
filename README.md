@@ -14,12 +14,23 @@ Because the map is an ordinary Drive file, sharing works the way Drive sharing a
 
 The app uses the `drive.file` scope, which only grants access to files the user opens with the app or picks in Google Picker. It cannot browse the rest of anyone's Drive. When someone follows a viewer link to a map they haven't opened before, the app shows Google Picker with that file preselected so one click grants access.
 
+## Google Slides version
+
+Drive's own image preview can't show clickable areas, and Google doesn't let apps add to it. **⋮ → Save as Google Slides** makes a Google Slides file next to the image, named `<image> (linked)`. It holds one slide sized to the image, with the image filling it and a transparent linked shape over each area. Rectangles, circles and polygons all keep their exact outline.
+
+Areas are clickable when the deck is presented (**Slideshow**, or **⋮ → Present Google Slides version** in Image Mapper) and for people with view-only access. While the deck is open for editing, Slides shows a link chip instead of following the link.
+
+The deck is a snapshot. After changing the map, choose **⋮ → Update Google Slides version**. That replaces the deck's contents in place, so its link and sharing stay the same. Edits made directly in the deck are overwritten by the next update.
+
+The app builds a `.pptx` in the browser and has Drive convert it on upload, because the Slides API can only place images from public URLs and can't draw freeform shapes.
+
 ## Features
 
 - Rectangle, circle and polygon areas, stored in the image's own pixel coordinates
 - Select, move, reshape, reorder and delete areas
 - Link areas to Drive files through Google Picker, or to any `http`, `https` or `mailto` URL
 - View mode with hover highlighting, keyboard access and a "Show areas" toggle
+- Save as Google Slides: a native Slides file in Drive with the image and an invisible linked shape over each area, so the links work without this app
 - Copy a viewer link, or copy a standard HTML `<map>` snippet for use on a website
 - Keyboard shortcuts: `V` select, `R` rectangle, `C` circle, `P` polygon, `Enter` closes a polygon, `Esc` cancels, `Delete` removes the selected area, `Ctrl/Cmd+S` saves
 
@@ -129,6 +140,8 @@ css/app.css       Styles (light and dark)
 js/config.js      Your Google Cloud IDs
 js/drive.js       Sign-in, Drive REST calls, Google Picker
 js/editor.js      SVG drawing and editing of areas
+js/slides.js      Builds the Google Slides version
+js/vendor/        PptxGenJS 3.12.0 (MIT, bundles JSZip)
 js/app.js         Opening, saving, linking and the rest of the UI
 privacy.html      Privacy policy (required by Google)
 terms.html        Terms of service (required by Google)
@@ -146,6 +159,7 @@ assets/icons/     PNG icons for Drive and the Marketplace
   "width": 960,
   "height": 600,
   "updatedAt": "2026-10-29T12:00:00.000Z",
+  "slidesId": "1XyZ...",
   "regions": [
     { "id": "r1", "shape": "rect", "coords": [46, 46, 371, 251], "title": "Reception",
       "link": { "url": "https://docs.google.com/document/d/.../edit", "name": "Reception notes", "fileId": "...", "mimeType": "application/vnd.google-apps.document" } },
@@ -155,4 +169,4 @@ assets/icons/     PNG icons for Drive and the Marketplace
 }
 ```
 
-Rectangles are `[x, y, width, height]`, circles `[centreX, centreY, radius]`, and polygons a list of `[x, y]` points, all in the image's natural pixels.
+`slidesId` is present once a Google Slides version has been made. Rectangles are `[x, y, width, height]`, circles `[centreX, centreY, radius]`, and polygons a list of `[x, y]` points, all in the image's natural pixels.

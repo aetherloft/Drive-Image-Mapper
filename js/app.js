@@ -15,6 +15,7 @@
     demo: false,
     image: null, // Drive file metadata of the image
     mapFile: null, // Drive file metadata of the saved map (null until first save)
+    slidesId: null, // Google Slides copy made by "Save as Google Slides"
     canEdit: true,
     dirty: false,
     saving: false,
@@ -38,13 +39,21 @@
   // ---------- small UI helpers ----------
 
   let toastTimer = null;
-  function toast(message, isError = false) {
+  function toast(message, isError = false, link = null) {
     const t = $('toast');
     t.textContent = message;
+    if (link) {
+      const a = document.createElement('a');
+      a.href = link.href;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = link.text;
+      t.append(' ', a);
+    }
     t.classList.toggle('is-error', isError);
     t.hidden = false;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { t.hidden = true; }, isError ? 7000 : 3500);
+    toastTimer = setTimeout(() => { t.hidden = true; }, isError || link ? 9000 : 3500);
   }
 
   function setLoading(text) {
@@ -262,6 +271,7 @@
     state.objectUrl = URL.createObjectURL(blob);
     state.image = image;
     state.mapFile = mapFile;
+    state.slidesId = (mapData && mapData.slidesId) || null;
     state.canEdit = state.demo || !mapFile || !mapFile.capabilities || mapFile.capabilities.canEdit !== false;
     state.dirty = false;
     showWorkspace();
@@ -273,6 +283,7 @@
     // Maps with content open ready to click; new or empty maps open ready to draw.
     setMode(editor.regions.length ? 'view' : 'edit');
     updateSaveStatus();
+    updateMenu();
   }
 
   async function chooseImage(folderId) {
@@ -299,6 +310,7 @@
       width: editor.width,
       height: editor.height,
       updatedAt: new Date().toISOString(),
+      slidesId: state.slidesId || undefined,
       regions: editor.regions.map(({ id, shape, coords, title, link }) => ({ id, shape, coords, title: title || '', link: link || null })),
     }, null, 2);
   }
@@ -392,6 +404,104 @@
     editor.updateRegion(region.id, { link: { url: url.href, name: '' } });
   }
 
+  // ---------- Google Slides copy ----------
+
+  const SLIDES_MIME = 'application/vnd.google-apps.presentation';
+
+  function baseName() {
+    return state.image.name.replace(/\.[^.]+$/, '') || 'Image';
+  }
+
+  async function exportSlides() {
+    if (!editor.regions.some((r) => r.link && r.link.url)) {
+      toast('Link at least one area first.');
+      return;
+    }
+    if (!state.demo && state.canEdit && (state.dirty || !state.mapFile)) {
+      await save();
+      if (state.dirty) return; // save failed and already said why
+    }
+    setLoading('Building Google Slides…');
+    try {
+      const pptx = await SlidesExport.buildPptx({
+        img: editor.img,
+        mimeType: state.image.mimeType,
+        width: editor.width,
+        height: editor.height,
+        regions: editor.regions,
+        title: baseName(),
+      });
+
+      if (state.demo) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(pptx);
+        a.download = `${baseName()}.pptx`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+        toast('Downloaded a .pptx. Signed in, this goes straight into Drive as Google Slides.');
+        return;
+      }
+
+      const previousId = state.slidesId;
+      let file = null;
+      if (previousId) {
+        // Replace the contents of the existing deck so its link and sharing stay the same.
+        try {
+          file = await Drive.upload(previousId, {}, pptx, SlidesExport.PPTX_MIME);
+          if (file.trashed) file = null;
+        } catch (err) {
+          if (err.status === 401 || err.status >= 500) throw err;
+        }
+      }
+      if (!file) file = await createSlidesFile(pptx);
+
+      if (file.id !== previousId) {
+        state.slidesId = file.id;
+        if (state.canEdit) await save(); // records the deck in the map file
+      }
+      updateMenu();
+      const msg = file.id === previousId
+        ? 'Google Slides version updated.'
+        : previousId
+          ? 'Made a new Google Slides version (the old one couldn’t be updated).'
+          : 'Google Slides version created next to the image.';
+      toast(msg, false, { href: slidesUrl(file), text: 'Open it' });
+    } catch (err) {
+      console.error(err);
+      toast('Could not make the Slides version: ' + err.message, true);
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function createSlidesFile(pptx) {
+    const meta = {
+      name: `${baseName()} (linked)`,
+      mimeType: SLIDES_MIME,
+      description: `Clickable version of "${state.image.name}" made by Image Mapper. Present it, or open it view-only, to click the areas.`,
+      appProperties: { imageId: state.image.id },
+    };
+    const parents = (state.mapFile && state.mapFile.parents) || state.image.parents;
+    const folder = parents && parents[0];
+    try {
+      return await Drive.upload(null, folder ? { ...meta, parents: [folder] } : meta, pptx, SlidesExport.PPTX_MIME);
+    } catch (err) {
+      if (!folder || (err.status !== 403 && err.status !== 404)) throw err;
+      return Drive.upload(null, meta, pptx, SlidesExport.PPTX_MIME);
+    }
+  }
+
+  function slidesUrl(file) {
+    return file.webViewLink || `https://docs.google.com/presentation/d/${file.id}/edit`;
+  }
+
+  function updateMenu() {
+    const item = $('menuList').querySelector('[data-action="slides"]');
+    item.textContent = state.slidesId ? 'Update Google Slides version' : 'Save as Google Slides';
+    const open = $('menuList').querySelector('[data-action="openslides"]');
+    open.hidden = !state.slidesId || state.demo;
+  }
+
   // ---------- menu actions ----------
 
   async function copy(text, done) {
@@ -422,6 +532,10 @@
     } else if (action === 'html') {
       const src = state.demo ? 'image.png' : `https://drive.google.com/uc?id=${state.image.id}`;
       copy(editor.toHtml(src, state.image.name), 'HTML image map copied.');
+    } else if (action === 'slides') {
+      exportSlides();
+    } else if (action === 'openslides') {
+      window.open(`https://docs.google.com/presentation/d/${state.slidesId}/present`, '_blank', 'noopener');
     } else if (action === 'mapfile') {
       if (state.demo || !state.mapFile) return toast('Save the map first.');
       window.open(state.mapFile.webViewLink || `https://drive.google.com/file/d/${state.mapFile.id}/view`, '_blank', 'noopener');
