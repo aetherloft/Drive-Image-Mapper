@@ -8,7 +8,9 @@
     select: 'Click an area to select it. Drag to move, drag the handles to reshape. Delete removes it.',
     rect: 'Drag across the image to draw a rectangle.',
     circle: 'Press at the centre and drag outwards.',
-    poly: 'Click to add corners. Click the first point, double-click, or press Enter to close. Esc cancels.',
+    poly: 'Click each corner of the shape in turn. Click the first corner again, double-click, or press Enter to close it. Esc cancels.',
+    free: 'Drag around the area to outline it. Shift-drag adds to the selected area.',
+    wand: 'Click inside a room or shape to outline it automatically. Shift-click adds to the selected area. If it spills into a neighbour, lower Tolerance or raise Close gaps, then undo (Ctrl+Z) and try again.',
   };
 
   const state = {
@@ -34,6 +36,8 @@
       renderProps();
     },
     onActivate: openLink,
+    onBusy: (busy) => editor.stage.classList.toggle('is-busy', busy),
+    onNotice: (message) => toast(message),
   });
 
   // ---------- small UI helpers ----------
@@ -114,7 +118,7 @@
     list.replaceChildren();
     editor.regions.forEach((region, index) => {
       const li = document.createElement('li');
-      if (region.id === editor.selectedId) li.classList.add('is-selected');
+      if (editor.selection.includes(region.id)) li.classList.add('is-selected');
       const swatch = document.createElement('span');
       swatch.className = 'swatch' + (region.link && region.link.url ? '' : ' is-unlinked');
       const label = document.createElement('span');
@@ -125,12 +129,12 @@
       target.textContent = linkLabel(region.link) || 'No link';
       li.append(swatch, label, target);
       li.tabIndex = 0;
-      const activate = () => {
+      const activate = (e) => {
         if (state.mode === 'view') openLink(region);
         else {
           editor.setTool('select');
           syncToolButtons();
-          editor.select(region.id);
+          editor.select(region.id, !!(e && e.shiftKey));
         }
       };
       li.addEventListener('click', activate);
@@ -147,9 +151,14 @@
   }
 
   function renderProps() {
-    const region = state.mode === 'edit' ? editor.getRegion(editor.selectedId) : null;
+    const editing = state.mode === 'edit';
+    const count = editing ? editor.selection.length : 0;
+    $('multiPanel').hidden = count < 2;
+    $('multiCount').textContent = count;
+    const region = editing ? editor.getRegion(editor.selectedId) : null;
     $('propsPanel').hidden = !region;
     if (!region) return;
+    $('splitBtn').hidden = region.shape !== 'multi';
     const title = $('regionTitle');
     if (document.activeElement !== title) title.value = region.title || '';
     const link = region.link;
@@ -171,6 +180,7 @@
   function syncToolButtons() {
     document.querySelectorAll('.tool').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tool === editor.tool)));
     $('toolHint').textContent = TOOL_HINTS[editor.tool];
+    $('wandOptions').hidden = editor.tool !== 'wand';
   }
 
   function setMode(mode) {
@@ -731,6 +741,17 @@
     if (region) editor.updateRegion(region.id, { link: null });
   });
   $('deleteBtn').addEventListener('click', () => editor.deleteRegion(editor.selectedId));
+  $('deleteManyBtn').addEventListener('click', () => editor.deleteRegions(editor.selection));
+  $('combineBtn').addEventListener('click', () => {
+    if (!editor.combine()) toast('Those areas could not be combined.', true);
+  });
+  $('splitBtn').addEventListener('click', () => editor.split(editor.selectedId));
+  for (const [input, out, key] of [['wandTol', 'wandTolOut', 'tolerance'], ['wandGap', 'wandGapOut', 'gap']]) {
+    $(input).addEventListener('input', (e) => {
+      editor.wandOptions[key] = Number(e.target.value);
+      $(out).textContent = e.target.value;
+    });
+  }
   $('raiseBtn').addEventListener('click', () => editor.reorder(editor.selectedId, 1));
   $('lowerBtn').addEventListener('click', () => editor.reorder(editor.selectedId, -1));
 
@@ -755,9 +776,15 @@
       save();
       return;
     }
-    const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
+    const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName) && document.activeElement.type !== 'range';
     if (typing || $('workspace').hidden || state.mode !== 'edit') return;
-    const tools = { v: 'select', r: 'rect', c: 'circle', p: 'poly' };
+    if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'z' || e.key.toLowerCase() === 'y')) {
+      e.preventDefault();
+      if (e.key.toLowerCase() === 'y' || e.shiftKey) editor.redo();
+      else editor.undo();
+      return;
+    }
+    const tools = { v: 'select', r: 'rect', c: 'circle', p: 'poly', f: 'free', w: 'wand' };
     if (!e.ctrlKey && !e.metaKey && !e.altKey && tools[e.key.toLowerCase()]) {
       editor.setTool(tools[e.key.toLowerCase()]);
       syncToolButtons();
@@ -765,9 +792,9 @@
       if (!editor.cancelDraft()) editor.select(null);
     } else if (e.key === 'Enter') {
       editor.finishPolygon();
-    } else if ((e.key === 'Delete' || e.key === 'Backspace') && editor.selectedId) {
+    } else if ((e.key === 'Delete' || e.key === 'Backspace') && editor.selection.length) {
       e.preventDefault();
-      editor.deleteRegion(editor.selectedId);
+      editor.deleteRegions(editor.selection);
     }
   });
 

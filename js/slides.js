@@ -67,21 +67,25 @@
         const [cx, cy, r] = c;
         slide.addShape(pptx.ShapeType.ellipse, { x: (cx - r) * k, y: (cy - r) * k, w: 2 * r * k, h: 2 * r * k, ...invisible, hyperlink });
       } else {
-        const xs = c.map((pt) => pt[0]);
-        const ys = c.map((pt) => pt[1]);
-        const minX = Math.min(...xs);
-        const minY = Math.min(...ys);
-        const points = c.map(([x, y]) => ({ x: (x - minX) * k, y: (y - minY) * k }));
-        points.push({ close: true });
-        slide.addShape(pptx.ShapeType.custGeom, {
-          x: minX * k,
-          y: minY * k,
-          w: (Math.max(...xs) - minX) * k,
-          h: (Math.max(...ys) - minY) * k,
-          points,
-          ...invisible,
-          hyperlink,
-        });
+        // A multi-part area becomes one linked shape per outline (holes are skipped).
+        const rings = region.shape === 'multi' ? Geometry.outerRings(c) : [c];
+        for (const ring of rings) {
+          const xs = ring.map((pt) => pt[0]);
+          const ys = ring.map((pt) => pt[1]);
+          const minX = Math.min(...xs);
+          const minY = Math.min(...ys);
+          const points = ring.map(([x, y]) => ({ x: (x - minX) * k, y: (y - minY) * k }));
+          points.push({ close: true });
+          slide.addShape(pptx.ShapeType.custGeom, {
+            x: minX * k,
+            y: minY * k,
+            w: (Math.max(...xs) - minX) * k,
+            h: (Math.max(...ys) - minY) * k,
+            points,
+            ...invisible,
+            hyperlink,
+          });
+        }
       }
     }
 

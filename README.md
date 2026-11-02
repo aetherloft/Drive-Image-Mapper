@@ -27,13 +27,15 @@ The app builds a `.pptx` in the browser and has Drive convert it on upload, beca
 ## Features
 
 - An Open window listing the images and maps you've recently opened or changed in the app, with Maps / Images filters and a button to browse all of Drive
-- Rectangle, circle and polygon areas, stored in the image's own pixel coordinates
-- Select, move, reshape, reorder and delete areas
+- Rectangle, circle, corner-by-corner, freehand and magic-wand areas, stored in the image's own pixel coordinates
+- Magic wand: click inside a room to trace its walls. Tolerance sets how different a colour can be and still count; Close gaps cuts doorways so the fill doesn't spill into the next room. Shift-click adds to the selected area
+- Combine: Shift-click several areas and merge them into one area with one link. Overlapping shapes become a single outline; separate shapes become one area with several parts. Split reverses it
+- Select, move, reshape, reorder and delete areas, with undo and redo (Ctrl+Z, Ctrl+Y)
 - Link areas to Drive files through Google Picker, or to any `http`, `https` or `mailto` URL
 - View mode with hover highlighting, keyboard access and a "Show areas" toggle
 - Save as Google Slides: a native Slides file in Drive with the image and an invisible linked shape over each area, so the links work without this app
 - Copy a viewer link, or copy a standard HTML `<map>` snippet for use on a website
-- Keyboard shortcuts: `V` select, `R` rectangle, `C` circle, `P` polygon, `Enter` closes a polygon, `Esc` cancels, `Delete` removes the selected area, `Ctrl/Cmd+S` saves
+- Keyboard shortcuts: `V` select, `R` rectangle, `C` circle, `P` corners, `F` freehand, `W` magic wand, `Ctrl/Cmd+Z` undo, `Ctrl/Cmd+Y` redo, `Enter` closes a polygon, `Esc` cancels, `Delete` removes the selected area, `Ctrl/Cmd+S` saves
 
 ## Setup
 
@@ -141,8 +143,10 @@ css/app.css       Styles (light and dark)
 js/config.js      Your Google Cloud IDs
 js/drive.js       Sign-in, Drive REST calls, Google Picker
 js/editor.js      SVG drawing and editing of areas
+js/geometry.js    Shape merging and simplifying
+js/wand.js        Magic wand fill and outline tracing
 js/slides.js      Builds the Google Slides version
-js/vendor/        PptxGenJS 3.12.0 (MIT, bundles JSZip)
+js/vendor/        PptxGenJS 3.12.0 (MIT, bundles JSZip), polygon-clipping 0.15.7 (MIT)
 js/app.js         Opening, saving, linking and the rest of the UI
 privacy.html      Privacy policy (required by Google)
 terms.html        Terms of service (required by Google)
@@ -170,4 +174,4 @@ assets/icons/     PNG icons for Drive and the Marketplace
 }
 ```
 
-`slidesId` is present once a Google Slides version has been made. Rectangles are `[x, y, width, height]`, circles `[centreX, centreY, radius]`, and polygons a list of `[x, y]` points, all in the image's natural pixels.
+A `multi` region stores a list of outlines (`[[x, y], ...]` each); an outline inside another is a hole. `slidesId` is present once a Google Slides version has been made. Rectangles are `[x, y, width, height]`, circles `[centreX, centreY, radius]`, and polygons a list of `[x, y]` points, all in the image's natural pixels.
