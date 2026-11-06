@@ -247,6 +247,7 @@
       let image;
       let mapFile = null;
       let mapData = null;
+      let mapWasTrashed = false;
 
       if (isMapFile(file)) {
         mapFile = file;
@@ -254,8 +255,9 @@
         image = await withAccess([mapData.imageId], () => Drive.getFile(mapData.imageId),
           'This map points to an image you need to select once to open.');
         // Maps made outside the app (by hand or by another tool) aren't linked from
-        // their image yet. Link them so opening the image finds this map next time.
-        if (!(image.appProperties && image.appProperties.imageMapFileId)) {
+        // their image yet, and a replaced map leaves the image pointing at the old one.
+        // Opening a map is a deliberate choice, so make the image point at it.
+        if (!(image.appProperties && image.appProperties.imageMapFileId === mapFile.id)) {
           Drive.updateMetadata(image.id, { appProperties: { imageMapFileId: mapFile.id } }).catch(() => {});
         }
         if (!(mapFile.appProperties && mapFile.appProperties.imageId) && mapFile.capabilities && mapFile.capabilities.canEdit) {
@@ -270,7 +272,10 @@
         } else {
           mapFile = await Drive.findMapForImage(file.id);
         }
-        if (mapFile && mapFile.trashed) mapFile = null;
+        if (mapFile && mapFile.trashed) {
+          mapFile = null;
+          mapWasTrashed = true;
+        }
         if (mapFile) mapData = await readMap(mapFile.id);
       } else {
         throw new Error(`"${file.name}" isn't an image. Image Mapper opens PNG, JPEG, GIF, WebP, BMP and SVG files.`);
@@ -278,6 +283,7 @@
 
       const blob = await Drive.download(image.id);
       await showImage(blob, image, mapFile, mapData);
+      if (mapWasTrashed) toast('This image’s map is in the trash. If it was replaced, open the new .imap file once and the image will use it from then on.');
       history.replaceState(null, '', mapFile ? `?map=${mapFile.id}&image=${image.id}` : `?file=${image.id}`);
     } catch (err) {
       console.error(err);
