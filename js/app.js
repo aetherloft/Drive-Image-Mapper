@@ -531,8 +531,24 @@
 
   const SLIDES_MIME = 'application/vnd.google-apps.presentation';
 
-  function baseName() {
-    return state.image.name.replace(/\.[^.]+$/, '') || 'Image';
+  function baseName(image = state.image) {
+    return image.name.replace(/\.[^.]+$/, '') || 'Image';
+  }
+
+  // Builds the deck for one map and writes it to Drive: into the map's existing
+  // deck when it has one (so the deck's link and sharing stay the same), else as a
+  // new file next to the map. Returns the deck's Drive file.
+  async function writeSlides({ image, mapFile, img, width, height, regions, slidesId }) {
+    const pptx = await SlidesExport.buildPptx({ img, mimeType: image.mimeType, width, height, regions, title: baseName(image) });
+    if (slidesId) {
+      try {
+        const file = await Drive.upload(slidesId, {}, pptx, SlidesExport.PPTX_MIME);
+        if (!file.trashed) return file;
+      } catch (err) {
+        if (err.status === 401 || err.status >= 500) throw err;
+      }
+    }
+    return createSlidesFile(pptx, image, mapFile);
   }
 
   async function exportSlides() {
@@ -546,16 +562,15 @@
     }
     setLoading('Building Google Slides…');
     try {
-      const pptx = await SlidesExport.buildPptx({
-        img: editor.img,
-        mimeType: state.image.mimeType,
-        width: editor.width,
-        height: editor.height,
-        regions: editor.regions,
-        title: baseName(),
-      });
-
       if (state.demo) {
+        const pptx = await SlidesExport.buildPptx({
+          img: editor.img,
+          mimeType: state.image.mimeType,
+          width: editor.width,
+          height: editor.height,
+          regions: editor.regions,
+          title: baseName(),
+        });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(pptx);
         a.download = `${baseName()}.pptx`;
@@ -566,17 +581,15 @@
       }
 
       const previousId = state.slidesId;
-      let file = null;
-      if (previousId) {
-        // Replace the contents of the existing deck so its link and sharing stay the same.
-        try {
-          file = await Drive.upload(previousId, {}, pptx, SlidesExport.PPTX_MIME);
-          if (file.trashed) file = null;
-        } catch (err) {
-          if (err.status === 401 || err.status >= 500) throw err;
-        }
-      }
-      if (!file) file = await createSlidesFile(pptx);
+      const file = await writeSlides({
+        image: state.image,
+        mapFile: state.mapFile,
+        img: editor.img,
+        width: editor.width,
+        height: editor.height,
+        regions: editor.regions,
+        slidesId: previousId,
+      });
 
       if (file.id !== previousId) {
         state.slidesId = file.id;
@@ -597,14 +610,14 @@
     }
   }
 
-  async function createSlidesFile(pptx) {
+  async function createSlidesFile(pptx, image, mapFile) {
     const meta = {
-      name: `${baseName()} (linked)`,
+      name: `${baseName(image)} (linked)`,
       mimeType: SLIDES_MIME,
-      description: `Clickable version of "${state.image.name}" made by Image Mapper. Present it, or open it view-only, to click the areas.`,
-      appProperties: { imageId: state.image.id },
+      description: `Clickable version of "${image.name}" made by Image Mapper. Present it, or open it view-only, to click the areas.`,
+      appProperties: { imageId: image.id },
     };
-    const parents = (state.mapFile && state.mapFile.parents) || state.image.parents;
+    const parents = (mapFile && mapFile.parents) || image.parents;
     const folder = parents && parents[0];
     try {
       return await Drive.upload(null, folder ? { ...meta, parents: [folder] } : meta, pptx, SlidesExport.PPTX_MIME);
@@ -612,6 +625,117 @@
       if (!folder || (err.status !== 403 && err.status !== 404)) throw err;
       return Drive.upload(null, meta, pptx, SlidesExport.PPTX_MIME);
     }
+  }
+
+  function loadImage(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('The image could not be read.'));
+      img.src = src;
+    });
+  }
+
+  // Makes or updates the Slides deck for several maps at once. The user picks
+  // .imap files; images the app can't read yet are granted in one more picker.
+  async function exportSlidesBatch() {
+    const startFolder = (state.mapFile && state.mapFile.parents && state.mapFile.parents[0])
+      || (state.image && state.image.parents && state.image.parents[0]) || null;
+    let picked;
+    try {
+      picked = await Drive.pick({ kind: 'map', multiple: true, startFolder, title: 'Select the maps to save as Google Slides' });
+    } catch (err) {
+      toast(err.message, true);
+      return;
+    }
+    if (!picked || !picked.length) return;
+    for (const doc of picked) if (doc.resourceKey) Drive.addResourceKeys({ [doc.id]: doc.resourceKey });
+
+    const done = [];
+    const failed = [];
+    const jobs = [];
+    try {
+      setLoading('Reading maps…');
+      for (const doc of picked) {
+        try {
+          const mapFile = await Drive.getFile(doc.id);
+          if (!isMapFile(mapFile)) continue;
+          jobs.push({ mapFile, data: await readMap(doc.id) });
+        } catch (err) {
+          failed.push(`${doc.name}: ${err.message}`);
+        }
+      }
+
+      const needAccess = [];
+      for (const job of jobs) {
+        try {
+          job.image = await Drive.getFile(job.data.imageId);
+        } catch (err) {
+          if (err.status === 404 || err.status === 403) needAccess.push(job);
+          else failed.push(`${job.mapFile.name}: ${err.message}`);
+        }
+      }
+      if (needAccess.length) {
+        setLoading(null);
+        toast('Select the highlighted images too, so Image Mapper can put them in the slides.');
+        const granted = await Drive.pick({
+          fileIds: needAccess.map((job) => job.data.imageId),
+          multiple: true,
+          title: 'Select these images to include them',
+        });
+        for (const doc of granted || []) if (doc.resourceKey) Drive.addResourceKeys({ [doc.id]: doc.resourceKey });
+        for (const job of needAccess) {
+          try {
+            job.image = await Drive.getFile(job.data.imageId);
+          } catch (err) {
+            failed.push(`${job.mapFile.name}: no access to its image`);
+          }
+        }
+      }
+
+      const ready = jobs.filter((job) => job.image);
+      for (const [i, job] of ready.entries()) {
+        const { mapFile, data, image } = job;
+        setLoading(`Building Slides ${i + 1} of ${ready.length}: ${baseName(image)}`);
+        let url = null;
+        try {
+          url = URL.createObjectURL(await Drive.download(image.id));
+          const img = await loadImage(url);
+          const file = await writeSlides({
+            image,
+            mapFile,
+            img,
+            width: data.width || img.naturalWidth,
+            height: data.height || img.naturalHeight,
+            regions: data.regions || [],
+            slidesId: data.slidesId,
+          });
+          // Record the deck in the map so the next run updates it in place.
+          if (file.id !== data.slidesId && !(mapFile.capabilities && mapFile.capabilities.canEdit === false)) {
+            const updated = { ...data, slidesId: file.id, updatedAt: new Date().toISOString() };
+            const saved = await Drive.upload(mapFile.id, { appProperties: { imageId: image.id } }, JSON.stringify(updated, null, 2), Drive.MAP_MIME);
+            if (state.mapFile && state.mapFile.id === mapFile.id) {
+              state.mapFile = saved;
+              state.slidesId = file.id;
+              updateMenu();
+            }
+          }
+          done.push(file);
+        } catch (err) {
+          console.error(err);
+          failed.push(`${mapFile.name}: ${err.message}`);
+        } finally {
+          if (url) URL.revokeObjectURL(url);
+        }
+      }
+    } finally {
+      setLoading(null);
+    }
+
+    const summary = `Saved ${done.length} map${done.length === 1 ? '' : 's'} as Google Slides`;
+    if (failed.length) toast(`${summary}. ${failed.length} failed: ${failed.join('; ')}`, true);
+    else if (done.length === 1) toast(`${summary}.`, false, { href: slidesUrl(done[0]), text: 'Open it' });
+    else toast(`${summary}, each next to its map.`);
   }
 
   function slidesUrl(file) {
@@ -655,6 +779,9 @@
     } else if (action === 'html') {
       const src = state.demo ? 'image.png' : `https://drive.google.com/uc?id=${state.image.id}`;
       copy(editor.toHtml(src, state.image.name), 'HTML image map copied.');
+    } else if (action === 'slidesbatch') {
+      if (state.demo) return toast('Sign in with Google to save maps as Google Slides.');
+      exportSlidesBatch();
     } else if (action === 'slides') {
       exportSlides();
     } else if (action === 'openslides') {

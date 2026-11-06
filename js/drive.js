@@ -168,7 +168,7 @@
   }
 
   // Opens Google Picker. Resolves to an array of picked docs, or null if cancelled.
-  //   kind: 'image' | 'any'
+  //   kind: 'image' (images and maps) | 'map' (.imap files only) | 'any'
   //   fileIds: preselect specific files (used to grant access to a shared map/image)
   //   startFolder: open on this folder first (its own tab ahead of My Drive)
   async function pick({ kind = 'any', fileIds = null, title = '', multiple = false, startFolder = null } = {}) {
@@ -197,11 +197,14 @@
         // type is in the filter too; setSelectFolderEnabled decides whether a
         // folder can be picked or only opened.
         const images = kind === 'image';
-        const mimeTypes = images ? IMAGE_MIME_TYPES.concat(MAP_MIME, FOLDER_MIME).join(',') : null;
+        const filtered = images || kind === 'map';
+        const mimeTypes = images
+          ? IMAGE_MIME_TYPES.concat(MAP_MIME, FOLDER_MIME).join(',')
+          : kind === 'map' ? [MAP_MIME, FOLDER_MIME].join(',') : null;
         const tab = (label, configure) => {
           const view = new P.DocsView(P.ViewId.DOCS)
             .setIncludeFolders(true)
-            .setSelectFolderEnabled(!images)
+            .setSelectFolderEnabled(!filtered)
             .setMode(P.DocsViewMode.LIST);
           if (mimeTypes) view.setMimeTypes(mimeTypes);
           configure(view);

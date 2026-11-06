@@ -20,6 +20,8 @@ Drive's own image preview can't show clickable areas, and Google doesn't let app
 
 Areas are clickable when the deck is presented (**Slideshow**, or **⋮ → Present Google Slides version** in Image Mapper) and for people with view-only access. While the deck is open for editing, Slides shows a link chip instead of following the link.
 
+**⋮ → Save several maps as Google Slides…** does the same for many maps at once: select the `.imap` files in the picker (Shift-click or Ctrl-click to choose several), and each gets its own deck next to it. If the app can't read some of the images yet, a second picker asks you to select them.
+
 The deck is a snapshot. After changing the map, choose **⋮ → Update Google Slides version**. That replaces the deck's contents in place, so its link and sharing stay the same. Edits made directly in the deck are overwritten by the next update.
 
 The app builds a `.pptx` in the browser and has Drive convert it on upload, because the Slides API can only place images from public URLs and can't draw freeform shapes.
